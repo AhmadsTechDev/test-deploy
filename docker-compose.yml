@@ -59,9 +59,15 @@ services:
       # Default port 80 (buka http://IP-VM). Kalau port 80 sudah dipakai
       # (misal Laragon di Windows), isi APP_PORT=8080 di .env.
       - "${APP_PORT:-80}:80"
+    # restart: true -> nginx ikut di-restart kalau backend dibuat ulang (misal setelah --build),
+    # karena nginx menyimpan IP backend saat start dan IP container baru bisa berbeda.
     depends_on:
-      - backend1
-      - backend2
+      backend1:
+        condition: service_started
+        restart: true
+      backend2:
+        condition: service_started
+        restart: true
 
 volumes:
   dbdata:
