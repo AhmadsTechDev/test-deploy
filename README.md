@@ -114,10 +114,11 @@ upstream backend {
 }
 ```
 
-Lalu reload nginx (tanpa build ulang, karena config di-mount):
+Config nginx ikut dimasukkan ke dalam image, jadi build ulang nginx untuk menerapkannya:
 ```bash
+docker compose up -d --build nginx          # build ulang + ganti container nginx
 docker compose exec nginx nginx -t          # cek apakah config valid
-docker compose exec nginx nginx -s reload   # terapkan config baru
+docker compose exec nginx nginx -T          # lihat config yang sedang dipakai
 ```
 
 Pilihan lain yang bisa dicoba: `least_conn;` (pilih server yang paling sepi) atau

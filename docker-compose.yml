@@ -48,16 +48,17 @@ services:
 
   # ---------- NGINX (web server + reverse proxy + load balancer) ----------
   nginx:
-    build: ./frontend
+    build:
+      context: ./frontend
+      # Folder ./nginx ikut dikirim ke proses build supaya nginx.conf bisa di-COPY
+      # ke dalam image (lihat frontend/Dockerfile).
+      additional_contexts:
+        nginxconf: ./nginx
     restart: unless-stopped
     ports:
       # Default port 80 (buka http://IP-VM). Kalau port 80 sudah dipakai
       # (misal Laragon di Windows), isi APP_PORT=8080 di .env.
       - "${APP_PORT:-80}:80"
-    volumes:
-      # Mount folder, bukan file: kalau file di-mount langsung, editan dari vim/nano
-      # di Linux sering tidak terlihat oleh container (inode-nya berganti).
-      - ./nginx:/etc/nginx/conf.d:ro
     depends_on:
       - backend1
       - backend2
