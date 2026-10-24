@@ -1,0 +1,66 @@
+name: todo-nginx
+
+services:
+  # ---------- DATABASE ----------
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD di .env}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro # bikin tabel otomatis
+    ports:
+      # Hanya bisa diakses dari mesin ini (untuk dev tanpa Docker), tidak dari jaringan luar.
+      # Catatan: port Docker melewati firewall ufw, jadi jangan buka ke 0.0.0.0.
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      retries: 10
+
+  # ---------- BACKEND (2 instance yang sama persis) ----------
+  # Tidak ada "ports" di sini: backend TIDAK bisa diakses langsung dari luar.
+  # Satu-satunya pintu masuk adalah nginx.
+  backend1:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET:?isi JWT_SECRET di .env}
+      INSTANCE_NAME: backend-1
+    depends_on:
+      db:
+        condition: service_healthy
+
+  backend2:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET:?isi JWT_SECRET di .env} # HARUS sama dengan backend1
+      INSTANCE_NAME: backend-2
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ---------- NGINX (web server + reverse proxy + load balancer) ----------
+  nginx:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      # Default port 80 (buka http://IP-VM). Kalau port 80 sudah dipakai
+      # (misal Laragon di Windows), isi APP_PORT=8080 di .env.
+      - "${APP_PORT:-80}:80"
+    volumes:
+      # Mount folder, bukan file: kalau file di-mount langsung, editan dari vim/nano
+      # di Linux sering tidak terlihat oleh container (inode-nya berganti).
+      - ./nginx:/etc/nginx/conf.d:ro
+    depends_on:
+      - backend1
+      - backend2
+
+volumes:
+  dbdata:
